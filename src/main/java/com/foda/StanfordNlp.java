@@ -9,6 +9,8 @@ import edu.stanford.nlp.pipeline.Annotation;
 import edu.stanford.nlp.semgraph.SemanticGraph;
 import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations;
 import edu.stanford.nlp.simple.*;
+import edu.stanford.nlp.trees.SimpleTree;
+import edu.stanford.nlp.trees.TreeFactory;
 import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations;
@@ -46,8 +48,8 @@ public class StanfordNlp {
     }
 
     private void parserOutput(Annotation document){
-        long startTime=0;
-        long endTime=0;
+        long startTime;
+        long endTime;
 
         // these are all the sentences in this document
         // a CoreMap is essentially a Map that uses class objects as keys and has values with custom types
@@ -79,7 +81,7 @@ public class StanfordNlp {
 
             // 分析动词短语
             startTime = System.currentTimeMillis();    //获取开始时间
-            List<String> vvs = getVVFromTree(tree);
+            List<String> vvs = getLongVPFromTree(tree);
             endTime = System.currentTimeMillis();    //获取结束时间
             System.out.println("获取动词短语耗时：" + (endTime - startTime) + "ms");    //输出程序运行时
             System.out.println("-----------------------------------");
@@ -98,19 +100,20 @@ public class StanfordNlp {
     }
 
     /**
-     * 从一个语法树中分析动词短语
-     * @param tree
-     * @return 返回一个stringlist
+     * 对于复杂语法分析nlp分析得不准确，暂不使用此方法
+     * 从一个语法树中获取一个精简的动词短语
+     * @param tree 语法树
+     * @return 返回一个字符串列表
      */
-    private List<String> getVVFromTree(Tree tree)
-    {
-        Tree parent=null;
-        ArrayList<String> list=new ArrayList<String>();
+    private List<String> getVVFromTree(Tree tree) {
+        Tree parent = tree;
+        ArrayList<String> list = new ArrayList<>();
         StringBuilder sb;
-        for (Tree subtree:tree.subTreeList()) {
+
+        for (Tree subtree : tree.subTreeList()) {
             if (subtree.value().toLowerCase().equals("vv") &&
-                    parent.value().toLowerCase().equals("vp")){
-                sb=new StringBuilder();
+                    parent.value().toLowerCase().equals("vp")) {
+                sb = new StringBuilder();
                 sb.append(subtree.firstChild().value());
                 sb.append(getNNFromVP(parent));
 //                    for (Word word:parent.yieldWords()) {
@@ -118,12 +121,58 @@ public class StanfordNlp {
 //                    }
                 list.add(sb.toString());
 //                System.out.println(sb.toString());
-                System.out.print(sb.toString()+"\t");
+                System.out.print(sb.toString() + "\t");
             }
-            parent=subtree;
+            parent = subtree;
         }
         System.out.println();
         return list;
+    }
+
+    /**
+     * 从一个语法树中获取一个未精简的动词短语
+     * @param tree 语法树
+     * @return 返回动词短语列表
+     */
+    private List<String> getLongVPFromTree(Tree tree) {
+        Tree parent = tree;
+        ArrayList<String> list = new ArrayList<>();
+        StringBuilder sb;
+
+        for (Tree subtree : tree.subTreeList()) {
+            if (subtree.value().toLowerCase().equals("vv") &&
+                    parent.value().toLowerCase().equals("vp")) {
+                sb = new StringBuilder();
+                for (Word w:parent.yieldWords()){
+                    sb.append(w.word());
+                }
+                list.add(sb.toString());
+                System.out.print(sb.toString() + "\t");
+            }
+            parent = subtree;
+        }
+        System.out.println();
+        return list;
+    }
+
+    /**
+     * 判断一个语法树中是否还有动词短语结构
+     * @param tree 语法树
+     * @return True or False
+     */
+    private boolean hasVP(Tree tree) {
+        boolean result = false;
+        Tree parent = tree;
+
+        for (Tree subtree : tree.subTreeList()) {
+            if (subtree.value().toLowerCase().equals("vv") &&
+                    parent.value() !=null &&
+                    parent.value().toLowerCase().equals("vp")) {
+                result = true;
+            }
+            parent = subtree;
+        }
+        return result;
     }
 
     /**
@@ -133,7 +182,7 @@ public class StanfordNlp {
      */
     private String getNNFromVP(Tree tree)
     {
-        Tree parent=null;
+        Tree parent=tree;
         StringBuilder sb=new StringBuilder();
         for (Tree subtree:tree.subTreeList()) {
             if (subtree.value().toLowerCase().equals("nn")){
