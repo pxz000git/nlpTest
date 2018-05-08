@@ -1,102 +1,102 @@
 package com.foda;
 
-import com.opencsv.CSVReader;
 import edu.stanford.nlp.io.IOUtils;
 import edu.stanford.nlp.ling.CoreAnnotations;
-import edu.stanford.nlp.ling.CoreLabel;
 import edu.stanford.nlp.pipeline.StanfordCoreNLP;
 import edu.stanford.nlp.pipeline.Annotation;
-import edu.stanford.nlp.semgraph.SemanticGraph;
-import edu.stanford.nlp.semgraph.SemanticGraphCoreAnnotations;
-import edu.stanford.nlp.simple.*;
 import edu.stanford.nlp.trees.SimpleTree;
-import edu.stanford.nlp.trees.TreeFactory;
 import edu.stanford.nlp.util.CoreMap;
 import edu.stanford.nlp.trees.Tree;
 import edu.stanford.nlp.trees.TreeCoreAnnotations;
-import edu.stanford.nlp.dcoref.CorefChain;
-import edu.stanford.nlp.dcoref.CorefCoreAnnotations;
 import edu.stanford.nlp.ling.Word;
+import edu.stanford.nlp.simple.*;
 
-import java.io.File;
-import java.io.FileReader;
 import java.util.*;
-import java.util.logging.Filter;
 
-import java.util.Properties;
+@SuppressWarnings("unused")
+class StanfordNlp {
 
-public class StanfordNlp {
-
-    private StanfordCoreNLP corenlp;
+    private StanfordCoreNLP pipeline;
+    private Properties props;
 
     public StanfordNlp() throws Exception{
         // 配置nlp属性
-        Properties props = new Properties();
+        props = new Properties();
         props.load(IOUtils.readerFromString("./StanfordCoreNLP-chinese.properties"));
-        corenlp = new StanfordCoreNLP(props);
     }
 
+    /**
+     * 使用simpleNlp包中的类解析短文
+     * @param text 需要解析的短文
+     * @return 短文的中动词短语，以字符串存放，句号分割。
+     */
+    public String simpleNlp(String text) {
+        Document doc = new Document(props, text);
+        StringBuilder vps = new StringBuilder();
+
+        for (Sentence sentence : doc.sentences()) {
+            System.out.println("sentence: "+sentence);
+            Tree tree = sentence.parse();
+            tree.pennPrint();
+            for (String s:getLongVPFromTree(tree)) {
+                System.out.println(s);
+                vps.append(s + "。");
+            }
+        }
+        return vps.toString();
+    }
 
     /**
      * 对一段话进行语法分析
      * @param text 需要分析的句子或文章
      */
-    public void runChineseAnnotators(String text){
+    public String runChineseAnnotators(String text){
+        pipeline = new StanfordCoreNLP(props);
+        /*
         Annotation document = new Annotation(text);
-        corenlp.annotate(document);
+        pipeline.annotate(document);
         parserOutput(document);
+        */
+        Annotation annotation = pipeline.process(text);
+        //System.out.println(pipeline.timingInformation());
+        return parserOutput(annotation);
     }
 
-    private void parserOutput(Annotation document){
+    private String parserOutput(Annotation document){
         long startTime;
         long endTime;
+        StringBuilder vps = new StringBuilder();
 
         // these are all the sentences in this document
         // a CoreMap is essentially a Map that uses class objects as keys and has values with custom types
         List<CoreMap> sentences = document.get(CoreAnnotations.SentencesAnnotation.class);
 
         for(CoreMap sentence: sentences) {
+            /*
             // traversing the words in the current sentence
             // a CoreLabel is a CoreMap with additional token-specific methods
-//            for (CoreLabel token: sentence.get(CoreAnnotations.TokensAnnotation.class)) {
-//                // this is the text of the token
-//                String word = token.get(CoreAnnotations.TextAnnotation.class);
-//                // this is the POS tag of the token
-//                String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
-//                // this is the NER label of the token
-//                String ne = token.get(CoreAnnotations.NamedEntityTagAnnotation.class);
-//                System.out.println(word+"\t"+pos+"\t"+ne);
-//            }
+            for (CoreLabel token: sentence.get(CoreAnnotations.TokensAnnotation.class)) {
+                // this is the text of the token
+                String word = token.get(CoreAnnotations.TextAnnotation.class);
+                // this is the POS tag of the token
+                String pos = token.get(CoreAnnotations.PartOfSpeechAnnotation.class);
+                // this is the NER label of the token
+                String ne = token.get(CoreAnnotations.NamedEntityTagAnnotation.class);
+                System.out.println(word+"\t"+pos+"\t"+ne);
+            }
+            */
 
             System.out.println("sentence: "+sentence);
-            // this is the parse tree of the current sentence
+
+            // 获取语法树
             Tree tree = sentence.get(TreeCoreAnnotations.TreeAnnotation.class);
-
-            startTime = System.currentTimeMillis();    //获取开始时间
-            System.out.println("语法树：");
             tree.pennPrint();
-            endTime = System.currentTimeMillis();    //获取结束时间
-            System.out.println("解析成语法树耗时：" + (endTime - startTime) + "ms");    //输出程序运行时
-            System.out.println("-----------------------------------");
 
-            // 分析动词短语
-            startTime = System.currentTimeMillis();    //获取开始时间
-            List<String> vvs = getLongVPFromTree(tree);
-            endTime = System.currentTimeMillis();    //获取结束时间
-            System.out.println("获取动词短语耗时：" + (endTime - startTime) + "ms");    //输出程序运行时
-            System.out.println("-----------------------------------");
-
-            // this is the Stanford dependency graph of the current sentence
-//            SemanticGraph dependencies = sentence.get(SemanticGraphCoreAnnotations.CollapsedCCProcessedDependenciesAnnotation.class);
-//            System.out.println("依存句法：");
-//            System.out.println(dependencies.toString());
+            // 获取动词短语
+            for (String s:getLongVPFromTree(tree))
+                vps.append(s+"。");
         }
-
-        // This is the coreference link graph
-        // Each chain stores a set of mentions that link to each other,
-        // along with a method for getting the most representative mention
-        // Both sentence and token offsets start at 1!
-//        Map<Integer, CorefChain> graph = document.get(CorefCoreAnnotations.CorefChainAnnotation.class);
+        return vps.toString();
     }
 
     /**
@@ -136,18 +136,24 @@ public class StanfordNlp {
      */
     private List<String> getLongVPFromTree(Tree tree) {
         Tree parent = tree;
+        Tree parentVP = new SimpleTree();
         ArrayList<String> list = new ArrayList<>();
         StringBuilder sb;
 
         for (Tree subtree : tree.subTreeList()) {
             if (subtree.value().toLowerCase().equals("vv") &&
                     parent.value().toLowerCase().equals("vp")) {
+
                 sb = new StringBuilder();
+
                 for (Word w:parent.yieldWords()){
                     sb.append(w.word());
                 }
-                list.add(sb.toString());
-                System.out.print(sb.toString() + "\t");
+                if (!list.contains(sb.toString()) && !parentVP.contains(subtree)){
+                    list.add(sb.toString());
+                    parentVP = parent;
+                }
+//                System.out.print(sb.toString() + "\t");
             }
             parent = subtree;
         }

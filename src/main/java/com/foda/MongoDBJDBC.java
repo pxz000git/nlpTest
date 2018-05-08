@@ -6,9 +6,9 @@ import com.mongodb.client.MongoCollection;
 import com.mongodb.client.MongoDatabase;
 
 
-public class MongoDBJDBC {
-    private String host;
-    private int port;
+class MongoDBJDBC {
+    private final String host;
+    private final int port;
 
     public MongoDBJDBC(String host,int port)
     {
@@ -17,11 +17,11 @@ public class MongoDBJDBC {
     }
 
     public String getHost() {
-        return host;
+        return this.host;
     }
 
     public int getPort() {
-        return port;
+        return this.port;
     }
 
     // 获取集合
