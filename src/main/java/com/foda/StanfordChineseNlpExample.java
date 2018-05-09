@@ -41,7 +41,8 @@ public class StanfordChineseNlpExample {
         try {
             FileWriter fw = new FileWriter("./phrase.csv", true);
             out = new BufferedWriter(fw);
-            for (Document document : doc.find().batchSize(3).projection(
+            // 设置batchSize为30
+            for (Document document : doc.find().batchSize(30).projection(
                     Projections.fields(
                             Projections.include("html"),
                             Projections.excludeId())).limit(5000)) {
